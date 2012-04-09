@@ -1,6 +1,8 @@
 package AnyEvent::RW;
 
 use 5.008008;
+use uni::perl ':dumper';
+use Scalar::Util ();
 use common::sense 2;m{
 use strict;
 use warnings;
@@ -51,14 +53,29 @@ sub MAX_READ_SIZE () { 128 * 1024 }
 sub new {
 	my $pk = shift;
 	my $self = bless {@_}, $pk;
+	$self->{debug} //= 1;
+	$self->{for} = " (".fileno($self->{fh}).") @{[ (caller)[1,2] ]}" if $self->{debug};
+	if ($self->{debug}) {
+		warn sprintf "%08x creating AE::RW for %s\n", int $self, $self->{for};
+	}
 	$self->init();
 	$self;
 }
 
-sub init {
+sub upgrade {
 	my $self = shift;
+	my $class = shift;
+	$class =~ s{^\+}{} or $class = "AnyEvent::RW::$class";
+	croak "$class is not a subclass of ".ref($self) if !UNIVERSAL::isa($class,ref($self));
+	bless $self,$class;
+	$self->init();
+}
+
+sub init {
+	Scalar::Util::weaken( my $self = shift );
 	#warn dumper $self;
 	
+	$self->{debug} //= 1;
 	$self->{wsize} = 1;
 	$self->{wlast} = $self->{wbuf} = { s => 0 };
 	
@@ -69,12 +86,111 @@ sub init {
 	&AnyEvent::Util::fh_nonblocking( $self->{fh}, 1 );
 	binmode $self->{fh}, ':raw';
 	
-	$self->_rw;
+	# \Compat
+	if (exists $self->{on_timeout} or exists $self->{on_eof} or exists $self->{on_error}) {
+		my $end = delete $self->{on_end};
+		$self->{on_end} = sub {
+			$self or return;
+			# on_timeout could be undestructive, so leave it as in AE::Handle
+			#return $self->{on_timeout}() if $! == Errno::ETIMEDOUT and exists $self->{on_timeout};
+			return $self->{on_eof}() if $! == Errno::EPIPE and exists $self->{on_eof};
+			return $self->{on_error}() if $! > 0 and exists $self->{on_error};
+			return $self->{on_end}( $! > 0 ? "$!" : ());
+		};
+	}
+	# /Compat
+	
+	
+	$self->{_activity}  =
+	$self->{_ractivity} =
+	$self->{_wactivity} = AE::now;
+	
+	$self->timeout   (delete $self->{timeout}  ) if $self->{timeout};
+	$self->rtimeout  (delete $self->{rtimeout} ) if $self->{rtimeout};
+	$self->wtimeout  (delete $self->{wtimeout} ) if $self->{wtimeout};
+	
+	$self->_rw if $self->{on_read};
+}
+
+{ no strict 'refs';
+
+for my $dir ("", "r", "w") {
+   my $timeout    = "${dir}timeout";
+   my $tw         = "_${dir}tw";
+   my $on_timeout = "on_${dir}timeout";
+   my $activity   = "_${dir}activity";
+   my $cb;
+
+   *$on_timeout = sub {
+      $_[0]{$on_timeout} = $_[1];
+   };
+
+   *$timeout = sub {
+      my ($self, $new_value) = @_;
+
+      $new_value >= 0
+         or Carp::croak "AnyEvent::Handle->$timeout called with negative timeout ($new_value), caught";
+
+      $self->{$timeout} = $new_value;
+      delete $self->{$tw}; &$cb;
+   };
+
+   *{"${dir}timeout_reset"} = sub {
+      $_[0]{$activity} = AE::now;
+   };
+
+   # main workhorse:
+   # reset the timeout watcher, as neccessary
+   # also check for time-outs
+   $cb = sub {
+      my ($self) = @_;
+
+      if ($self->{$timeout} and $self->{fh}) {
+         my $NOW = AE::now;
+
+         # when would the timeout trigger?
+         my $after = $self->{$activity} + $self->{$timeout} - $NOW;
+
+         # now or in the past already?
+         if ($after <= 0) {
+            $self->{$activity} = $NOW;
+
+            if ($self->{$on_timeout}) {
+               $self->{$on_timeout}($self, $self->{$timeout} - $after);
+            } else {
+               {
+                  local $! = Errno::ETIMEDOUT;
+                  $self->_error (Errno::ETIMEDOUT);
+               }
+            }
+
+            # callback could have changed timeout value, optimise
+            return unless $self->{$timeout};
+
+            # calculate new after
+            $after = $self->{$timeout};
+         }
+
+         Scalar::Util::weaken $self;
+         return unless $self; # ->error could have destroyed $self
+
+         $self->{$tw} ||= AE::timer $after, 0, sub {
+            delete $self->{$tw};
+            $cb->($self);
+         };
+      } else {
+         delete $self->{$tw};
+      }
+   }
+}
 }
 
 sub _ww {
-	my $self = shift;
-	$self->{ww} = &AE::io( $self->{fh}, 1, sub {
+	Scalar::Util::weaken( my $self = shift );
+	return unless $self->{fh};
+	my $wr = sub {
+		#warn "can write";
+		$self or return;
 		#warn "ww";
 		delete $self->{ww};
 		my $cur = $self->{wbuf};
@@ -85,10 +201,26 @@ sub _ww {
 		};
 		#warn "drain $self->{wsize} ($cur->{s} .. $self->{wlast}{s}) ".dumper $cur;
 		while (exists $cur->{w}) {
+			if (my $ref = ref $cur->{w}) {
+				if ($ref eq 'CODE') {
+					$cur->{w}->();
+				} else {
+					warn "Doesn't know how to process $ref";
+				}
+				delete $cur->{w};
+				if ( exists $cur->{'next'} ) {
+					$cur = $cur->{'next'};
+					warn "take next $cur->{s}";
+					$self->{wbuf} = $cur;
+					$self->{wsize}--;
+				};
+				next;
+			}
 				$cur->{l} = length $cur->{w} unless exists $cur->{l};
 				#warn "call write $cur->{s}";
 				my $len = syswrite $self->{fh}, $cur->{w}, $cur->{l}, $cur->{o} || 0;
 				if (defined $len) {
+					$self->{_activity} = $self->{_wactivity} = AE::now;
 					$cur->{o} += $len;
 					$cur->{l} -= $len;
 					#warn "written $len, left $cur->{l}";#. dumper $cur;
@@ -108,42 +240,94 @@ sub _ww {
 					return $self->_ww;
 				}
 				else {
-					warn "Shit happens: $!";
+					{
+						local $! = 0+$!;
+						warn "Shit happens: $!";
+					}
+					$self->_error();
 					return;
 				}
 		}
-	});
+	};
+	$self->{ww} = &AE::io( $self->{fh}, 1, $wr);
+	$wr->();
 }
 sub _rw {
-	my $self = shift;
+	Scalar::Util::weaken( my $self = shift );
+	return unless $self->{fh};
 	$self->{rw} = AE::io( $self->{fh}, 0, sub {
-		#warn "rw";
+		local *__ANON__ = 'rw.cb';
+		$self or return;
 		my $buf;
 		my $len;
 		my $lsr;
-		while ( ( $len = sysread $self->{fh}, $buf, $self->{read_size}  ) ) {
+		#warn "read...";
+		while ( $self and ( $len = sysread $self->{fh}, $buf, $self->{read_size}  ) ) {
+			$self->{_activity} = $self->{_ractivity} = AE::now;
 			$lsr = $len;
+			#warn "read $len";
 			if ($len == $self->{read_size} and $self->{read_size} < $self->{max_read_size}) {
 				$self->{read_size} *= 2;
 				$self->{read_size} = $self->{max_read_size} || MAX_READ_SIZE
 					if $self->{read_size} > ($self->{max_read_size} || MAX_READ_SIZE);
 			}
-			$self->{read}(\$buf);
+			$self->{on_read}(\$buf);
 		}
+		#warn "lsr = $len/$!";
+		return unless $self;
 		if (defined $len) {
-			warn "EOF";
-			$self->{end}("EOF");
+			#warn "EOF";
+			$self->{_eof} = 1;
+			{
+				local $! = Errno::EPIPE;
+				$self->_error();
+			}
 			delete $self->{rw};
 		} else {
 			#if ($!{EAGAIN} or $!{EINTR} or $!{WSAEWOULDBLOCK}) {
 			if ($! == EAGAIN or $! == EINTR or $! == WSAEWOULDBLOCK) {
-				#warn "$! ($self->{read_size} / $lsr)";
+				#warn sysread $self->{fh},my $x,1;
+				warn "$! ($self->{read_size} / $lsr)";
 				return;
 			} else {
 				warn "Shit happens: $!";
 			}
 		}
 	} );
+}
+
+sub _error {
+	my $self = shift;
+	{
+		local $! = @_ ? $_[0] : 0+$!;
+		warn "error: $! (@_) @{[ (caller)[1,2] ]}";
+	}
+	delete $self->{fh};
+	delete $self->{rw};
+	delete $self->{ww};
+	if (exists $self->{on_end}) {
+		$self->{on_end}("$!");
+	} elsif ( exists $self->{on_read}) {
+		$self->{on_read}(undef, "$!");
+	}
+}
+
+sub AnyEvent::RW::destroyed::AUTOLOAD {}
+sub AnyEvent::RW::destroyed::destroyed { 1 }
+
+sub destroy {
+	my ($self) = @_;
+	$self->DESTROY;
+	%$self = ();
+	bless $self, "AnyEvent::RW::destroyed";
+}
+
+sub DESTROY {
+	my $self = shift;
+	$self->{on_destroy} and $self->{on_destroy}();
+	#warn sprintf "%08x (%d) Destroying AE::RW ($self->{for}) %s", int($self), fileno $self->{fh}, dumper $self->{wbuf} if $self->{debug};
+	warn sprintf "%08x (%d) Destroying AE::RW ($self->{for}) %s", int($self), fileno $self->{fh}, "@{[ (caller)[1,2] ]}" if $self->{debug};
+	%$self = ();
 }
 
 sub push_write {
@@ -157,6 +341,27 @@ sub push_write {
 	#warn dumper $self->{wbuf};
 	$self->_ww;
 }
+
+sub push_sub {
+	my $self = shift;
+	ref $_[0] or die "Need sub";
+	$self->{wsize}++;
+	$self->{seq}++;
+	my $l = { w => $_[0], s => $self->{seq} };
+	$self->{wlast}{next} = $l;
+	$self->{wlast} = $l;
+	#warn dumper $self->{wbuf};
+	$self->_ww;
+}
+
+sub push_close {
+	my $self = shift;
+	$self->push_sub(sub {
+		close $self->{fh};
+		$self->destroy;
+	});
+}
+
 
 =head1 AUTHOR
 
