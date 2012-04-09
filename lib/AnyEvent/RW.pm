@@ -287,7 +287,7 @@ sub _rw {
 			#if ($!{EAGAIN} or $!{EINTR} or $!{WSAEWOULDBLOCK}) {
 			if ($! == EAGAIN or $! == EINTR or $! == WSAEWOULDBLOCK) {
 				#warn sysread $self->{fh},my $x,1;
-				warn "$! ($self->{read_size} / $lsr)";
+				#warn "$! ($self->{read_size} / $lsr)";
 				return;
 			} else {
 				warn "Shit happens: $!";
@@ -298,10 +298,7 @@ sub _rw {
 
 sub _error {
 	my $self = shift;
-	{
-		local $! = @_ ? $_[0] : 0+$!;
-		warn "error: $! (@_) @{[ (caller)[1,2] ]}";
-	}
+	my $err = @_ ? $_[0] : 0+$!;
 	delete $self->{fh};
 	delete $self->{rw};
 	delete $self->{ww};
@@ -309,6 +306,10 @@ sub _error {
 		$self->{on_end}("$!");
 	} elsif ( exists $self->{on_read}) {
 		$self->{on_read}(undef, "$!");
+	} else {
+		local $! = $err;
+		warn "error: $! (@_) @{[ (caller)[1,2] ]}";
+		
 	}
 }
 

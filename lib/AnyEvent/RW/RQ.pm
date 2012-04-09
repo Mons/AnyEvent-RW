@@ -9,9 +9,16 @@ sub init {
 	$self->{on_read} and die "Don't set read callback";
 	$self->{on_read} = sub {
 		$self or return;
+		#warn "RW.RQ on_read";
 		local *__ANON__ = 'read.cb';
 		$self->{rbuf} .= ${$_[0]};
-		$self->_drain_r;
+		if (@{ $self->{rq} }) {
+			$self->_drain_r;
+		} else {
+			if (length $self->{rbuf} > 1024*256) {
+				warn "no more readers and big enough buffer\n";
+			}
+		}
 	};
 	$self->next::method();
 	return;
@@ -21,12 +28,16 @@ sub push_read {
 	my $self = shift;
 	unshift @_, 'regex' if UNIVERSAL::isa( $_[0], 'Regexp' );
 	push @{ $self->{rq} }, [@_];
+	$self->_drain_r if length $self->{rbuf};
+	return;
 }
 
 sub unshift_read {
 	my $self = shift;
 	unshift @_, 'regex' if UNIVERSAL::isa( $_[0], 'Regexp' );
 	unshift @{ $self->{rq} }, [@_];
+	$self->_drain_r if length $self->{rbuf};
+	return;
 }
 
 sub _drain_r {
@@ -100,7 +111,7 @@ sub _drain_r {
 		unshift @{ $self->{rq} },$i;
 	} else {
 		#warn "no more readers";
-		delete $self->{rw};
+		#delete $self->{rw};
 	}
 	return;
 }
