@@ -68,7 +68,7 @@ sub upgrade {
 	$class =~ s{^\+}{} or $class = "AnyEvent::RW::$class";
 	croak "$class is not a subclass of ".ref($self) if !UNIVERSAL::isa($class,ref($self));
 	bless $self,$class;
-	$self->init();
+	$self->init(@_);
 }
 
 sub init {
@@ -262,6 +262,7 @@ sub _rw {
 		my $len;
 		my $lsr;
 		#warn "read...";
+		no warnings 'unopened';
 		while ( $self and ( $len = sysread $self->{fh}, $buf, $self->{read_size}  ) ) {
 			$self->{_activity} = $self->{_ractivity} = AE::now;
 			$lsr = $len;
@@ -272,6 +273,7 @@ sub _rw {
 					if $self->{read_size} > ($self->{max_read_size} || MAX_READ_SIZE);
 			}
 			$self->{on_read}(\$buf);
+			$self->{on_read} or return delete $self->{rw};
 		}
 		#warn "lsr = $len/$!";
 		return unless $self;
@@ -291,6 +293,11 @@ sub _rw {
 				return;
 			} else {
 				warn "Shit happens: $!";
+				{
+					local $! = Errno::EPIPE;
+					$self->_error();
+				}
+				delete $self->{rw};
 			}
 		}
 	} );
@@ -304,9 +311,11 @@ sub _error {
 	delete $self->{ww};
 	if (exists $self->{on_end}) {
 		$self->{on_end}("$!");
-	} elsif ( exists $self->{on_read}) {
+	}
+	elsif ( exists $self->{on_read}) {
 		$self->{on_read}(undef, "$!");
-	} else {
+	}
+	else {
 		local $! = $err;
 		warn "error: $! (@_) @{[ (caller)[1,2] ]}";
 		
@@ -327,7 +336,7 @@ sub DESTROY {
 	my $self = shift;
 	$self->{on_destroy} and $self->{on_destroy}();
 	#warn sprintf "%08x (%d) Destroying AE::RW ($self->{for}) %s", int($self), fileno $self->{fh}, dumper $self->{wbuf} if $self->{debug};
-	warn sprintf "%08x (%d) Destroying AE::RW ($self->{for}) %s", int($self), fileno $self->{fh}, "@{[ (caller)[1,2] ]}" if $self->{debug};
+	warn sprintf "%08x (%d) Destroying AE::RW ($self->{for}) %s", int($self), $self->{fh} ? fileno $self->{fh} : -1, "@{[ (caller)[1,2] ]}" if $self->{debug};
 	%$self = ();
 }
 
@@ -363,6 +372,36 @@ sub push_close {
 	});
 }
 
+sub starttls {
+	my ($self, $mode, $ctx) = @_;
+	require AnyEvent::RW::TLS;
+	$self->upgrade('TLS', $mode, $ctx);
+=for re
+	my $ctx ||= TLS_CTX();
+	
+	my $aetls = $ctx || TLS_CTX();
+	#$self->{tls} = $aetls ->_get_session( $mode, $self, $host_to_verify ); # TODO
+	$self->{tls} = my $tls = $aetls->_get_session( $mode, $self );
+	
+	Net::SSLeay::CTX_set_mode ($tls, 1|2);
+	
+	$self->{_rbio} = Net::SSLeay::BIO_new (Net::SSLeay::BIO_s_mem ());
+	$self->{_wbio} = Net::SSLeay::BIO_new (Net::SSLeay::BIO_s_mem ());
+	
+	Net::SSLeay::BIO_write ($self->{_rbio}, $self->{rbuf});
+	$self->{rbuf} = "";
+
+	Net::SSLeay::set_bio ($tls, $self->{_rbio}, $self->{_wbio});
+	
+=cut
+	#$self->{_on_starttls} = sub { $_[0]{on_starttls}(@_) }
+	#	if $self->{on_starttls};
+	
+	
+
+	#&_dotls; # need to trigger the initial handshake
+	#$self->start_read; # make sure we actually do read
+}
 
 =head1 AUTHOR
 

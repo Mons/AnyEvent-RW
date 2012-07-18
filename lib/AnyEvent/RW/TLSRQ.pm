@@ -1,8 +1,8 @@
-package AnyEvent::RW::RQ;
+package AnyEvent::RW::TLSRQ;
 
 use uni::perl ':dumper';
 use Scalar::Util ();
-use parent 'AnyEvent::RW';
+use parent 'AnyEvent::RW::TLS';
 
 sub init {
 	Scalar::Util::weaken( my $self = shift );
