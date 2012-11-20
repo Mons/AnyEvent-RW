@@ -1,7 +1,6 @@
 #!/usr/bin/env perl -w
 
-use common::sense;
-use lib::abs '../lib';
+use strict;
 use Test::More tests => 5;
 use Test::NoWarnings;
 

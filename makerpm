@@ -1,0 +1,126 @@
+#!/usr/bin/perl
+
+use strict;
+use FindBin;
+our ($LIB);
+BEGIN {
+	$LIB = "$FindBin::Bin/lib";
+}
+use File::Find;
+use Config;
+use YAML;
+use lib "$FindBin::Bin/inc";
+use RPM::Make::DWIW;
+my $meta = YAML::LoadFile("$FindBin::Bin/META.yml");
+
+sub say (@) { print @_,"\n"; }
+
+=for rem
+for (keys %Config) {
+	length $Config{$_} or next;
+	$Config{$_} eq 'define' and next;
+	say $_, ' = ',$Config{$_};
+}
+__END__
+=cut
+# rpm --eval '%{_arch}'
+
+say();
+
+say $Config{installbin};
+say $Config{installscript};
+say $Config{installman1dir};
+say $Config{installman3dir};
+say $Config{sitelib};
+say $Config{sitearch};
+
+unless (-e "$FindBin::Bin/blib") {
+	die "Can't find $FindBin::Bin/blib: $!. You should run make first\n";
+}
+
+my %dest = (
+	"$FindBin::Bin/blib/bin"    => $Config{installbin},
+	"$FindBin::Bin/blib/script" => $Config{installscript},
+	"$FindBin::Bin/blib/lib"    => $Config{sitelib},
+	"$FindBin::Bin/blib/arch"   => $Config{sitearch},
+	"$FindBin::Bin/blib/man1"   => $Config{installman1dir},
+	"$FindBin::Bin/blib/man3"   => $Config{installman3dir},
+);
+
+my $xs = 0;
+my %files;
+for my $dir (keys %dest) {
+	( my $key = $dir ) =~ s{^\Q$FindBin::Bin/blib\E/}{};
+	$files{$key} ||= [];
+	find sub {
+		return if -d;
+		return if m{^\.exists$};
+		$xs = 1 if /\.(o|so|bs)$/;
+		( my $name = $File::Find::name ) =~ s{^\Q$dir\E/}{}s;
+		print $File::Find::name, " => $dest{$dir} | $name\n";
+		push @{ $files{$key} }, {
+			src  => $File::Find::name,
+			dest => "$dest{$dir}/$name",
+		};
+	}, $dir;
+}
+
+use Data::Dumper;
+
+my $spec = {
+	tags => {
+        Summary     => $meta->{abstract},
+        Name        => 'perl-'.$meta->{name},
+        Version     => $meta->{version},
+        Release     => '1',
+        License     => 'perl',
+        Group       => 'Development/Libraries',
+        #Source     => 'ftp://ftp.acme.com/acmedb_client-1.3.tar.gz',
+        #URL        => 'http://www.acme.com/acmedb_client/',
+        #Distribution => 'ACME',
+        #Vendor     => 'ACME Software, Inc.',
+        Packager   => $meta->{author}[0],
+	},
+	description => $meta->{abstract},
+	items => [
+		{
+			defaults => 1,
+			type => 'file',
+			mode => '0755',
+			owner => 'root',
+			group => 'wheel',
+		},
+		@{ $files{bin} },
+		@{ $files{script} },
+		
+		{
+			defaults => 1,
+			mode => '0444',
+		},
+		@{ $files{lib} },
+		@{ $files{arch} },
+		@{ $files{man1} },
+		@{ $files{man3} },
+	],
+	requirements => [
+		{
+			name        => 'perl',
+			min_version => '5.8.8',
+		},
+		( map {+{
+			name => 'perl-'.$_,
+			min_version => $meta->{requires}{$_},
+		}} keys %{ $meta->{requires} }),
+	],
+    #pre     => 'echo pre',
+    #preun   => 'echo preun',
+    #post    => 'echo post',
+    #postun  => 'echo postun',
+    cleanup => 1,
+    !$xs ? ( target => 'noarch' ) : (),
+};
+#warn Dumper $spec;
+#warn Dumper $meta;
+
+RPM::Make::DWIW::write_rpm($spec);
+system("mv", RPM::Make::DWIW::get_rpm_filename(), "$FindBin::Bin/dist/");

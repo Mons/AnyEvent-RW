@@ -16,5 +16,9 @@ make disttest && \
 make dist && \
 cp -f *.tar.gz dist/ && \
 make clean && \
+$perl Makefile.PL && \
+make && \
+perl makerpm && \
+make clean && \
 rm -rf MANIFEST.bak Makefile.old && \
 echo "All is OK"

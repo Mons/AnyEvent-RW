@@ -1,5 +1,5 @@
 # Avoid version control files.
-\B\.git\b
+\B\.git(?:ignore|)\b
 
 # Avoid Makemaker generated and utility files.
 \bMANIFEST\.bak
@@ -31,3 +31,5 @@
 ^tmp/
 ^AnyEvent-RW-.*
 /Kit\.pm$
+^xt/
+^ex/

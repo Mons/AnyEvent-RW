@@ -1,13 +1,5 @@
-.gitignore
 Changes
-ex/ae_reader.pl
-ex/ae_writer.pl
-ex/http.pl
-ex/my_reader.pl
-ex/my_test.pl
-ex/my_timeout.pl
-ex/my_writer.pl
-ex/sample.pl
+inc/RPM/Make/DWIW.pm
 Kit.pm.PL
 lib/AnyEvent/RW.pm
 lib/AnyEvent/RW/RQ.pm
@@ -15,14 +7,13 @@ lib/AnyEvent/RW/TLS.pm
 lib/AnyEvent/RW/TLSRQ.pm
 LICENSE
 Makefile.PL
+makerpm
+makerpm.sh
 MANIFEST			This list of files
 MANIFEST.SKIP
 META.yml
-MYMETA.json
-MYMETA.yml
 README
 t/00-load.t
 t/01-test.t
 t/pod-coverage.t
 t/pod.t
-xt/99-dist.t

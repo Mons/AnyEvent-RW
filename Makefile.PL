@@ -1,7 +1,7 @@
 use 5.008008;
 use ExtUtils::MakeMaker;
 
-our $AUTHOR = -e '.gitignore';
+our $AUTHOR = -e '.git';
 if ($AUTHOR) {
 	#system( 'pod2text lib/XML/Fast.pm > README' ) and die "$!";
 }
@@ -33,7 +33,6 @@ author         'Mons Anderson <mons@cpan.org>';
 license        'perl';
 
 build_requires 'Test::More';
-build_requires 'lib::abs',  '0.90';
 
 requires 'common::sense',    2;
 requires 'AnyEvent',         5;

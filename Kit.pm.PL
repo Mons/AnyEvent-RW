@@ -28,7 +28,7 @@ BEGIN {
 	%HINTS = %^H;
 }
 
-use 5.010;
+use 5.008008;
 use strict;
 
 no  warnings;
@@ -42,23 +42,28 @@ use warnings qw(FATAL closed threads internal debugging pack substr malloc
                 reserved parenthesis taint closure semicolon);
 no  warnings qw(exec newline);
 
-use feature ();
-
 BEGIN {
 	if ($^V >= 5.011) {
+		require feature;
 		feature->import( qw(say state switch unicode_strings) );
-	} else {
+	}
+	elsif( $^V >= 5.090005 ) {
+		require feature;
 		feature->import( qw(say state switch) );
+		require mro;
+		mro->import('c3');
+	}
+	else {
+		# no features (
 	}
 }
 
 use utf8;
 use open qw(:utf8 :std);
-use mro 'c3';
 
 BEGIN {
 	$HINTS = $^H              & ~$HINTS;
-	$WARNS = ${^WARNING_BITS} & ~( $WARNS // ("\0" x length ${^WARNING_BITS}) );
+	$WARNS = ${^WARNING_BITS} & ~( $WARNS || ("\0" x length ${^WARNING_BITS}) );
 	my %h = %{^H};
 	delete @h{ keys %HINTS };
 	%HINTS = %h;
@@ -77,7 +82,8 @@ sub dumper($) {
 	$s;
 }
 
-printf "package #hide\n\t%s;\n\n", $package;
+#printf "package #hide\n\t%s;\n\n", $package;
+printf "package %s;\n\n", $package;
 
 while (<DATA>) {
 	if (/^SELFBEGIN/) {
@@ -136,7 +142,12 @@ m{
 use strict;
 use warnings;
 }x;
-use mro ();
+
+BEGIN {
+	if( $^V >= 5.090005 ) {
+		require mro;
+	}
+}
 use Scalar::Util 'weaken';
 
 # paste this into perl to find bitmask
@@ -167,7 +178,9 @@ sub import {
 	local $^W;
 IMPORT
 	# use mro 'c3';
-	mro::set_mro($caller, 'c3');
+	if ($INC{'mro.pm'}) {
+		mro::set_mro($caller, 'c3');
+	}
 	
 	#use open (:utf8 :std);
 	${^OPEN} = ":utf8\0:utf8";
@@ -190,8 +203,6 @@ IMPORT
 			}
 		}
 	}
-	require uni::perl::utf;
-	uni::perl::utf->load($caller);
 	return;
 }
 

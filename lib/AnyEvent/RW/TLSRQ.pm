@@ -55,8 +55,8 @@ sub _drain_r {
 		my $len = length $self->{rbuf};
 		#warn "loop [@{ $self->{rq} }]";
 		if ($i = shift @{ $self->{rq} }) {
-			given ($i->[0]) {
-				when ('line') {
+			for ($i->[0]) {
+				if ($_ eq 'line') {
 					#warn "parse as line";
 					if ((my $idx = index( $self->{rbuf}, "\n" )) > -1) {
 						my $s = substr($self->{rbuf},0,$idx+1,'');
@@ -69,7 +69,7 @@ sub _drain_r {
 						last LOOP;
 					}
 				}
-				when ('regex') {
+				if ( $_ eq 'regex') {
 					#warn "parse as regex $i->[1] ";#.dumper( $self->{rbuf} );
 					if ( $self->{rbuf} =~ $i->[1] ) {
 						#warn "regex match $+[0] ";
@@ -79,7 +79,7 @@ sub _drain_r {
 						last LOOP;
 					}
 				}
-				when ('chunk') {
+				if ( $_ eq 'chunk') {
 					#warn "parse as chunk $i->[1]";
 					if ( $i->[1] < $len ) {
 						$i->[2]( $self, substr($self->{rbuf},0,$i->[1],'') );
@@ -88,7 +88,7 @@ sub _drain_r {
 						last LOOP;
 					}
 				}
-				when ('all') {
+				if ( $_ eq 'all') {
 					#warn "pass all (eof=$self->{_eof})";
 					if ($len > 0) {
 						my $rr = delete $self->{rbuf};
@@ -99,10 +99,8 @@ sub _drain_r {
 						last LOOP;
 					}
 				}
-				default {
-					die "Unknown : $_";
-					last LOOP;
-				}
+				die "Unknown : $_";
+				last LOOP;
 				#$self->_error( Errno::EPIPE ) if $self->{_eof};
 				#last LOOP;
 			}

@@ -8,7 +8,7 @@ use warnings;
 
 =head1 NAME
 
-AnyEvent::RW - ...
+AnyEvent::RW - Faster non-blocking I/O on handles via AnyEvent
 
 =cut
 
@@ -40,8 +40,6 @@ our $VERSION = '0.01'; $VERSION = eval($VERSION);
 
 =cut
 
-#use uni::perl ':dumper';
-
 use Errno qw(EAGAIN EINTR);
 use AnyEvent::Util qw(WSAEWOULDBLOCK);
 
@@ -50,7 +48,8 @@ sub MAX_READ_SIZE () { 128 * 1024 }
 sub new {
 	my $pk = shift;
 	my $self = bless {@_}, $pk;
-	$self->{debug} //= 1;
+	#$self->{debug} //= 1;
+	$self->{debug} ||= 0;
 	$self->{for} = " (".fileno($self->{fh}).") @{[ (caller)[1,2] ]}" if $self->{debug};
 	if ($self->{debug}) {
 		warn sprintf "%08x creating AE::RW for %s\n", int $self, $self->{for};
@@ -72,7 +71,8 @@ sub init {
 	Scalar::Util::weaken( my $self = shift );
 	#warn dumper $self;
 	
-	$self->{debug} //= 1;
+	#$self->{debug} //= 1;
+	$self->{debug} ||= 0;
 	$self->{wsize} = 1;
 	$self->{wlast} = $self->{wbuf} = { s => 0 };
 	
@@ -402,7 +402,7 @@ sub starttls {
 
 =head1 AUTHOR
 
-Mons Anderson, C<< <mons@cpan.org> >>
+Mons Anderson <mons@cpan.org>
 
 =head1 COPYRIGHT & LICENSE
 
