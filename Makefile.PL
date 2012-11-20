@@ -1,3 +1,21 @@
+use 5.008008;
+use ExtUtils::MakeMaker;
+
+our $AUTHOR = -e '.gitignore';
+if ($AUTHOR) {
+	#system( 'pod2text lib/XML/Fast.pm > README' ) and die "$!";
+}
+
+WriteMakefile(
+	NAME              => 'AnyEvent::RW',
+	VERSION_FROM      => 'lib/AnyEvent/RW.pm',
+	ABSTRACT_FROM     => 'lib/AnyEvent/RW.pm',
+	PREREQ_PM         => { 'commons::sense' => 2, AnyEvent => 5 },
+	AUTHOR            => 'Mons Anderson <mons@cpan.org>',
+	META_ADD          => { license => 'perl' },
+);
+
+__END__
 use inc::Module::Install;
 
 my $MI  = $Module::Install::MAIN;
