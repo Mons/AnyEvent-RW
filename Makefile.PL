@@ -10,9 +10,17 @@ WriteMakefile(
 	NAME              => 'AnyEvent::RW',
 	VERSION_FROM      => 'lib/AnyEvent/RW.pm',
 	ABSTRACT_FROM     => 'lib/AnyEvent/RW.pm',
-	PREREQ_PM         => { 'commons::sense' => 2, AnyEvent => 5 },
+	PREREQ_PM         => { AnyEvent => 5 },
 	AUTHOR            => 'Mons Anderson <mons@cpan.org>',
 	META_ADD          => { license => 'perl' },
+	
+	PL_FILES          => {
+		"Kit.pm.PL" => '$(INST_LIB)/AnyEvent/RW/Kit.pm',
+		$AUTHOR ? (
+			"Kit.pm.PL" => 'lib/AnyEvent/RW/Kit.pm',
+		) : ()
+	},
+	clean             => { FILES => "Kit.pm" },
 );
 
 __END__

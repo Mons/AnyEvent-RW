@@ -30,3 +30,4 @@
 ^makeall\.sh$
 ^tmp/
 ^AnyEvent-RW-.*
+/Kit\.pm$

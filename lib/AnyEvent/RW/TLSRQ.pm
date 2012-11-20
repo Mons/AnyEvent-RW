@@ -1,12 +1,9 @@
 package AnyEvent::RW::TLSRQ;
 
-#use uni::perl ':dumper';
-use common::sense 2;m{
+use AnyEvent::RW::Kit;m{
 use strict;
 use warnings;
 };
-use Carp;
-use Scalar::Util ();
 use parent 'AnyEvent::RW::TLS';
 
 sub init {

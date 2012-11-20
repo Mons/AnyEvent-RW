@@ -1,12 +1,10 @@
 package AnyEvent::RW;
 
 use 5.008008;
-use Scalar::Util ();
-use common::sense 2;m{
+use AnyEvent::RW::Kit;m{
 use strict;
 use warnings;
 };
-use Carp;
 
 =head1 NAME
 
