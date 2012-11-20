@@ -10,6 +10,7 @@ build_requires 'Test::More';
 build_requires 'lib::abs',  '0.90';
 
 requires 'common::sense',    2;
+requires 'AnyEvent',         5;
 # requires 'uni::perl';
 
 auto_provides;

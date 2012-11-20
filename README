@@ -1,0 +1,40 @@
+NAME
+    AnyEvent::RW - ...
+
+SYNOPSIS
+        package Sample;
+        use AnyEvent::RW;
+
+        ...
+
+DESCRIPTION
+        ...
+
+METHODS
+    ...()
+        ...
+
+        my $aetls = $ctx || TLS_CTX();
+        #$self->{tls} = $aetls ->_get_session( $mode, $self, $host_to_verify ); # TODO
+        $self->{tls} = my $tls = $aetls->_get_session( $mode, $self );
+
+        Net::SSLeay::CTX_set_mode ($tls, 1|2);
+
+        $self->{_rbio} = Net::SSLeay::BIO_new (Net::SSLeay::BIO_s_mem ());
+        $self->{_wbio} = Net::SSLeay::BIO_new (Net::SSLeay::BIO_s_mem ());
+
+        Net::SSLeay::BIO_write ($self->{_rbio}, $self->{rbuf});
+        $self->{rbuf} = "";
+
+        Net::SSLeay::set_bio ($tls, $self->{_rbio}, $self->{_wbio});
+
+AUTHOR
+    Mons Anderson, "<mons@cpan.org>"
+
+COPYRIGHT & LICENSE
+    Copyright 2012 Mons Anderson, all rights reserved.
+
+    This program is free software; you can redistribute it and/or modify it
+    under the terms of either: the GNU General Public License as published
+    by the Free Software Foundation; or the Artistic License.
+

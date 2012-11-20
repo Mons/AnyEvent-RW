@@ -1,6 +1,11 @@
 package AnyEvent::RW::TLS;
 
-use uni::perl ':dumper';
+#use uni::perl ':dumper';
+use common::sense 2;m{
+use strict;
+use warnings;
+};
+use Carp;
 use Scalar::Util ();
 use parent 'AnyEvent::RW';
 
@@ -271,12 +276,12 @@ sub _ww1 {
 =cut
 		
 		my $cur = $self->{wbuf};
-		warn "drain $self->{wsize} ($cur->{s} .. $self->{wlast}{s}) ".dumper $cur;
+		#warn "drain $self->{wsize} ($cur->{s} .. $self->{wlast}{s}) ".dumper $cur;
 		while ( !exists $cur->{w} and exists $cur->{next} ) {
 			$self->{wsize}--;
 			$self->{wbuf} = $cur = $cur->{next};
 		};
-		warn "drain $self->{wsize} ($cur->{s} .. $self->{wlast}{s}) ".dumper $cur;
+		#warn "drain $self->{wsize} ($cur->{s} .. $self->{wlast}{s}) ".dumper $cur;
 		while (exists $cur->{w}) {
 			if (my $ref = ref $cur->{w}) {
 				if ($ref eq 'CODE') {

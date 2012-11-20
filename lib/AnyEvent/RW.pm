@@ -1,13 +1,12 @@
 package AnyEvent::RW;
 
 use 5.008008;
-use uni::perl ':dumper';
 use Scalar::Util ();
 use common::sense 2;m{
 use strict;
 use warnings;
 };
-#use Carp;
+use Carp;
 
 =head1 NAME
 
@@ -43,7 +42,7 @@ our $VERSION = '0.01'; $VERSION = eval($VERSION);
 
 =cut
 
-use uni::perl ':dumper';
+#use uni::perl ':dumper';
 
 use Errno qw(EAGAIN EINTR);
 use AnyEvent::Util qw(WSAEWOULDBLOCK);

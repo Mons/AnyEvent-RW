@@ -1,15 +1,15 @@
 package AnyEvent::HTTP::Fast;
 
-use lib::abs '..';
+use lib::abs '../lib';
 use uni::perl ':dumper';
 #use EV;
 use AnyEvent::Impl::Perl;
 use URI;
 use HTTP::Easy;
-use HTTP::Parser::XS;
+#use HTTP::Parser::XS;
 use AnyEvent::Socket;
 #use AnyEvent::DNS
-use AnyEvent::CacheDNS ':register';
+#use AnyEvent::CacheDNS ':register';
 use AnyEvent::RW::RQ;
 
 sub http_request {

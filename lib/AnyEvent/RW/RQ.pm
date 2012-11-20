@@ -1,6 +1,12 @@
 package AnyEvent::RW::RQ;
 
-use uni::perl ':dumper';
+#use uni::perl ':dumper';
+use common::sense 2;m{
+use strict;
+use warnings;
+};
+use Carp;
+
 use Scalar::Util ();
 use parent 'AnyEvent::RW';
 

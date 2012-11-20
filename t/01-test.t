@@ -2,8 +2,8 @@
 
 use common::sense;
 use lib::abs '../lib';
-use Test::More tests => 2;
+use Test::More skip_all => 'TODO: write tests';
 use Test::NoWarnings;
 use AnyEvent::RW;
 
-fail 'write your tests';
+fail 'write tests';
